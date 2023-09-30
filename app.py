@@ -14,6 +14,14 @@ class Result(Enum):
     Win = 1
 
 
+class ClientEvent(Enum):
+    ROOM_NOT_FOUND = 'room-not-found'
+    PLAYER_JOINED = 'player-joined'
+    PLAYER_INVALID_PLAY = 'player_invalid_play'
+    PLAYER_PLAY = 'player_played'
+    NEW_SCOREBOARD = 'new_scoreboard'
+
+
 class Play(Enum):
     ROCK = 0
     PAPER = 1
@@ -56,12 +64,12 @@ def main():
         room: Room = list(
             map(lambda r: r if r.id == game_room['room_id'] else None, rooms))
         if len(room) == 0:
-            await sio.emit('room-not-found', {'msg': 'room not found'}, to=sid)
+            await sio.emit(ClientEvent.ROOM_NOT_FOUND, {'msg': 'room not found'}, to=sid)
             return
         room = room[0]
         rooms[rooms.index(room)].player_2 = Player(sid, None)
         sio.enter_room(sid, room.id)
-        await sio.emit('player_joined', {'msg': f'user {sid} joined'}, room=room.id)
+        await sio.emit(ClientEvent.PLAYER_JOINED, {'msg': f'user {sid} joined'}, room=room.id)
         print(f'user {sid} joined room {room.id}')
 
     @sio.event
@@ -73,7 +81,7 @@ def main():
     @sio.event
     async def play(sid, play):
         if not play:
-            await sio.emit('player_invalid_play', {'msg': f'please set a valid play'}, to=sid)
+            await sio.emit(ClientEvent.PLAYER_INVALID_PLAY, {'msg': f'please set a valid play'}, to=sid)
             return
 
         room_id = sio.rooms(sid)[0]
@@ -84,7 +92,7 @@ def main():
             room)].player_1.id else rooms[rooms.index(room)].player_2).play = play['play']
         print(f'player {sid} made its play: {play["play"]}')
 
-        await sio.emit('player_played', {'player_1': json.dumps(rooms[rooms.index(
+        await sio.emit(ClientEvent.PLAYER_PLAY, {'player_1': json.dumps(rooms[rooms.index(
             room)].player_1.__dict__), 'player_2': json.dumps(rooms[rooms.index(room)].player_2.__dict__)}, room=room.id)
 
     @sio.event
@@ -96,9 +104,9 @@ def main():
             rooms[rooms.index(room)].player_1.score += 1
             rooms[rooms.index(room)].player_2.score += 1
         else:
-            (rooms[rooms.index(room)].player_1 if scoreboard['winner_id'] == rooms[rooms.index(
-                room)].player_1.id else rooms[rooms.index(room)].player_2).score += 3
-        await sio.emit('new_scoreboard', {'player_1_score': json.dumps(rooms[rooms.index(room)].player_1.score), 'player_2_score': json.dumps(rooms[rooms.index(room)].player_1.score)}, room=room.id)
+            (rooms[rooms.index(room)].player_1 if rooms[rooms.index(
+                room)].player_1.id == scoreboard['winner_id'] else rooms[rooms.index(room)].player_2).score += 3
+        await sio.emit(ClientEvent.NEW_SCOREBOARD, {'player_1_score': json.dumps(rooms[rooms.index(room)].player_1.score), 'player_2_score': json.dumps(rooms[rooms.index(room)].player_2.score)}, room=room.id)
 
 
 if __name__ == '__main__':
